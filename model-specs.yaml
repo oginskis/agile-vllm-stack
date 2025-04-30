@@ -1,0 +1,43 @@
+- name: llama3-8b
+  repository: vllm/vllm-openai
+  tag: v0.8.4
+  modelURL: meta-llama/Llama-3.1-8B-Instruct
+  replicaCount: 1
+  requestCPU: 3
+  requestMemory: 16Gi
+  requestGPU: 1
+  tolerations:
+  - key: "nvidia.com/gpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+  pvcStorage: 50Gi
+  storageClass: ebs-sc
+  vllmConfig:
+    enableChunkedPrefill: false
+    enablePrefixCaching: false
+    maxModelLen: 16384
+    dtype: bfloat16
+    extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+  hf_token: {{ env "HF_TOKEN" | default "" }}
+
+# - name: mistral-7b
+#   repository: vllm/vllm-openai
+#   tag: v0.8.4
+#   modelURL: mistralai/Mistral-7B-Instruct-v0.3
+#   replicaCount: 1
+#   requestCPU: 3
+#   requestMemory: 16Gi
+#   requestGPU: 1
+#   tolerations:
+#   - key: "nvidia.com/gpu"
+#     operator: "Exists"
+#     effect: "NoSchedule"
+#   pvcStorage: 50Gi
+#   storageClass: ebs-sc
+#   vllmConfig:
+#     enableChunkedPrefill: false
+#     enablePrefixCaching: false
+#     maxModelLen: 16384
+#     dtype: bfloat16
+#     extraArgs: ["--disable-log-requests", "--gpu-memory-utilization", "0.8"]
+#   hf_token: {{ env "HF_TOKEN" | default "" }}

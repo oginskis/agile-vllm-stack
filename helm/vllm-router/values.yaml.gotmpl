@@ -1,0 +1,20 @@
+routerSpec:
+  ingress:
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    enabled: true
+    className: nginx
+    hosts:
+    - host: {{ requiredEnv "INFERENCE_HOST" }}
+      paths:
+      - path: /
+        pathType: Prefix
+    tls:
+    - secretName: vllm-tls-cert
+      hosts:
+      - {{ requiredEnv "INFERENCE_HOST" }}
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  {{- $modelSpecFile := requiredEnv "MODEL_SPEC_FILE" }}
+  {{- tpl (readFile $modelSpecFile) . | nindent 2 }}

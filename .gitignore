@@ -1,0 +1,13 @@
+# Generated files
+kubeconfig
+.env
+
+# Generated cluster files
+cluster/cluster.yaml
+cluster/gpu-node-pool.yaml
+
+# Generated helm files
+helm/cert-manager/cluster-issuer.yaml
+
+# OS specific files
+.DS_Store

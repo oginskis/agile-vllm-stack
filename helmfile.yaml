@@ -1,0 +1,50 @@
+repositories:
+- name: ingress-nginx
+  url: https://kubernetes.github.io/ingress-nginx
+- name: bitnami
+  url: https://charts.bitnami.com/bitnami
+- name: jetstack
+  url: https://charts.jetstack.io
+- name: vllm
+  url: https://vllm-project.github.io/production-stack
+
+releases:
+- name: nginx-ingress
+  namespace: {{ env "NGINX_INGRESS_NAMESPACE" | default "ingress-nginx" }}
+  chart: ingress-nginx/ingress-nginx
+  version: {{ env "NGINX_INGRESS_VERSION" | default "4.12.0" }}
+  values:
+  - controller:
+      service:
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+      replicaCount: 1
+- name: external-dns
+  namespace: {{ env "EXTERNAL_DNS_NAMESPACE" | default "kube-system" }}
+  chart: bitnami/external-dns
+  version: {{ env "EXTERNAL_DNS_VERSION" | default "8.7.4" }}
+  values:
+  - provider: aws
+    domainFilters:
+    - {{ env "DNS_ZONE_NAME" | default "superhub.click" }}
+- name: cert-manager
+  namespace: {{ env "CERT_MANAGER_NAMESPACE" | default "cert-manager" }}
+  chart: jetstack/cert-manager
+  version: {{ env "CERT_MANAGER_VERSION" | default "v1.17.1" }}
+  values:
+  - installCRDs: true
+  hooks:
+  - events: ["postsync"]
+    showlogs: true
+    command: "kubectl"
+    args:
+      - "apply"
+      - "-f"
+      - "helm/cert-manager/cluster-issuer.yaml"
+- name: vllm-router
+  namespace: {{ env "VLLM_STACK_NAMESPACE" | default "vllm" }}
+  chart: vllm/vllm-stack
+  version: {{ env "VLLM_STACK_VERSION" | default "0.1.1" }}
+  values:
+  - helm/vllm-router/values.yaml.gotmpl
+
