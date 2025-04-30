@@ -108,6 +108,8 @@ The `model-specs.yaml` file defines the language models to be deployed:
   hf_token: {{ env "HF_TOKEN" | default "" }}
 ```
 
+The `deploy.sh` script is idempotent, which means you can modify the `model-specs.yaml` file to add new models or remove existing ones, then run `deploy.sh` again to apply those changes. Additional models will be deployed or removed based on your modifications without disrupting the overall infrastructure.
+
 ## Deployment Process
 
 ### 1. Deploy the Infrastructure
@@ -216,6 +218,16 @@ curl -X POST \
 - The infrastructure uses IAM roles for service accounts (IRSA) for secure pod identity
 - TLS certificates are automatically provisioned and renewed by cert-manager
 - GPU nodes have specific security groups and IAM roles
+
+## Future Improvements
+
+The following improvements are planned or can be implemented to enhance this stack:
+
+| Improvement | Description | Status |
+|-------------|-------------|--------|
+| **Model storage on EFS/S3** | Store models on EFS or S3 instead of EBS for better scalability and performance | Planned |
+| **Prometheus monitoring** | Add Prometheus-based observability for metrics collection and visualization | Planned |
+| **Model autoscaling** | Implement automatic scaling of model replicas based on traffic patterns | Planned |
 
 ## Contributing
 
