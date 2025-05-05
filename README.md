@@ -65,12 +65,14 @@ HF_TOKEN=your_huggingface_token
 | `INFERENCE_HOST` | Hostname for the inference endpoint | `inference.${DNS_ZONE_NAME}` |
 | `MODEL_SPEC_FILE` | Path to model specifications file | `./model_specs.yaml` |
 | `HF_TOKEN` | Hugging Face token for private model access | - |
-| `PROMETHEUS_HOST` | Hostname for Prometheus access | `prometheus.${DNS_ZONE_NAME}` |
-| `MONITORING_HOST` | Hostname for Grafana dashboards | `monitoring.${DNS_ZONE_NAME}` |
+| `PROMETHEUS_HOST` | Hostname for Prometheus access (optional) | - |
+| `MONITORING_HOST` | Hostname for Grafana dashboards (optional) | - |
 | `GRAFANA_PASSWORD` | Password for Grafana admin user | - |
 | `PROMETHEUS_NAMESPACE` | Namespace for monitoring components | `monitoring` |
 | `PROMETHEUS_STACK_VERSION` | Version of kube-prometheus-stack | `71.1.0` |
 | `PROMETHEUS_ADAPTER_VERSION` | Version of prometheus-adapter | `4.14.1` |
+
+> **Note:** If `PROMETHEUS_HOST` or `MONITORING_HOST` are not specified, Kubernetes ingresses for these monitoring components will not be created. The services will still be deployed, but will only be accessible through Kubernetes port-forwarding.
 
 ## Directory Structure
 
