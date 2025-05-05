@@ -2,17 +2,19 @@ routerSpec:
   ingress:
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
-    enabled: true
+    enabled: {{ if env "INFERENCE_HOST" }}true{{ else }}false{{ end }}
     className: nginx
+    {{ if env "INFERENCE_HOST" }}
     hosts:
-    - host: {{ requiredEnv "INFERENCE_HOST" }}
+    - host: {{ env "INFERENCE_HOST" }}
       paths:
       - path: /
         pathType: Prefix
     tls:
     - secretName: vllm-tls-cert
       hosts:
-      - {{ requiredEnv "INFERENCE_HOST" }}
+      - {{ env "INFERENCE_HOST" }}
+    {{ end }}
 servingEngineSpec:
   runtimeClassName: ""
   modelSpec:

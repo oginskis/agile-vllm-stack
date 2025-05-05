@@ -13,6 +13,8 @@ This infrastructure stack uses:
 - **Route53** for DNS management
 - **cert-manager** for TLS certificate management
 - **NGINX Ingress Controller** for traffic management
+- **Prometheus & Grafana** for comprehensive monitoring and observability
+- **Prometheus Adapter** for custom metrics and scaling
 
 ## Prerequisites
 
@@ -21,8 +23,10 @@ This infrastructure stack uses:
 - `kubectl` command-line tool
 - `helm` command-line tool
 - `helmfile` command-line tool
-- A Route53 DNS zone (specified by `DNS_ZONE_NAME`) that you control
-- Sufficient AWS GPU quota in your target region for GPU-enabled instances (g4dn, etc.)
+- A Route53 DNS zone (specified by `DNS_ZONE_NAME`) that you control (optional)
+- Sufficient AWS GPU quota in your target region for GPU-enabled instances (g4dn, g6e, etc.)
+
+> **Note:** If `DNS_ZONE_NAME` is not specified, the NGINX Ingress Controller, External-DNS, and cert-manager components will not be provisioned. This is useful if you don't have a Route53 zone under your control. In this case, you'll need to access your services through Kubernetes port-forwarding or another method.
 
 ## Configuration
 
@@ -41,6 +45,11 @@ GPU_NODE_FAMILIES='["g6e"]'
 INFERENCE_HOST=inference.example.com
 MODEL_SPEC_FILE=./model_specs.yaml
 
+# Monitoring configuration
+PROMETHEUS_HOST=prometheus.example.com
+MONITORING_HOST=monitoring.example.com
+GRAFANA_PASSWORD=your_secure_password
+
 # Authentication
 HF_TOKEN=your_huggingface_token
 ```
@@ -56,6 +65,12 @@ HF_TOKEN=your_huggingface_token
 | `INFERENCE_HOST` | Hostname for the inference endpoint | `inference.${DNS_ZONE_NAME}` |
 | `MODEL_SPEC_FILE` | Path to model specifications file | `./model_specs.yaml` |
 | `HF_TOKEN` | Hugging Face token for private model access | - |
+| `PROMETHEUS_HOST` | Hostname for Prometheus access | `prometheus.${DNS_ZONE_NAME}` |
+| `MONITORING_HOST` | Hostname for Grafana dashboards | `monitoring.${DNS_ZONE_NAME}` |
+| `GRAFANA_PASSWORD` | Password for Grafana admin user | - |
+| `PROMETHEUS_NAMESPACE` | Namespace for monitoring components | `monitoring` |
+| `PROMETHEUS_STACK_VERSION` | Version of kube-prometheus-stack | `71.1.0` |
+| `PROMETHEUS_ADAPTER_VERSION` | Version of prometheus-adapter | `4.14.1` |
 
 ## Directory Structure
 
@@ -71,6 +86,12 @@ infra/
 │   ├── cert-manager/
 │   │   ├── cluster-issuer.yaml.template
 │   │   └── cluster-issuer.yaml # Generated from template
+│   ├── kube-prom-stack/
+│   │   ├── values.yaml.gotmpl
+│   │   └── dashboards/
+│   │       └── vllm-dashboard.yaml
+│   ├── prometheus-adapter/
+│   │   └── values.yaml.gotmpl
 │   └── vllm-router/
 │       └── values.yaml.gotmpl
 ├── deploy.sh             # Deployment script
@@ -82,7 +103,12 @@ infra/
 
 ## Model Configuration
 
-The `model-specs.yaml` file defines the language models to be deployed:
+The `model-specs.yaml` file defines the language models to be deployed. Current models include:
+
+- **Llama 3.1 8B Instruct** - Meta's latest 8B parameter instruction-tuned model
+- **Mistral 7B Instruct v0.3** - Mistral AI's 7B parameter instruction-tuned model
+
+Example model configuration:
 
 ```yaml
 - name: llama3-8b
@@ -144,6 +170,9 @@ The deployment script performs the following steps:
    - External DNS
    - cert-manager
    - vLLM Router
+   - Prometheus Stack (kube-prometheus-stack)
+   - Prometheus Adapter
+   - Custom dashboards
 
 ### 2. Access the Cluster
 
@@ -174,6 +203,21 @@ The infrastructure includes the following Helm chart deployments:
 2. **External DNS** - Automatically manages DNS records in Route53
 3. **cert-manager** - Manages TLS certificates for HTTPS
 4. **vLLM Stack** - Deploys the vLLM inference server with OpenAI-compatible API
+5. **kube-prometheus-stack** - Comprehensive monitoring solution with Prometheus and Grafana
+6. **prometheus-adapter** - Enables custom metrics for Kubernetes HPA
+
+## Monitoring and Observability
+
+The stack includes a comprehensive monitoring solution based on Prometheus and Grafana:
+
+- **Prometheus** is deployed via kube-prometheus-stack and collects metrics from all components
+- **Grafana** provides visualization of metrics with pre-configured dashboards
+- **vLLM Dashboard** helps monitor inference performance, throughput, and GPU utilization
+- **Prometheus Adapter** enables scaling based on custom metrics like inference latency or throughput
+
+Access the monitoring interfaces at:
+- Grafana: `https://{MONITORING_HOST}` (login with admin and your configured password)
+- Prometheus: `https://{PROMETHEUS_HOST}`
 
 ## Inference API
 
@@ -197,6 +241,10 @@ curl -X POST \
   }'
 ```
 
+## GPU Support
+
+The infrastructure now supports the latest AWS GPU instances, including the g6e family which offers improved performance for LLM workloads. Configure your preferred GPU instance families in the `.env` file.
+
 ## Troubleshooting
 
 ### Common Issues
@@ -213,11 +261,16 @@ curl -X POST \
    - Check pod status: `kubectl get pods -n vllm`
    - View pod logs: `kubectl logs -n vllm -l app=vllm`
 
+4. **Monitoring Issues**
+   - Check Prometheus pods: `kubectl get pods -n monitoring`
+   - Check Grafana access: `kubectl port-forward -n monitoring svc/kube-prom-stack-grafana 3000:80`
+
 ## Security Notes
 
 - The infrastructure uses IAM roles for service accounts (IRSA) for secure pod identity
 - TLS certificates are automatically provisioned and renewed by cert-manager
 - GPU nodes have specific security groups and IAM roles
+- Grafana access is password-protected
 
 ## Future Improvements
 
@@ -226,8 +279,9 @@ The following improvements are planned or can be implemented to enhance this sta
 | Improvement | Description | Status |
 |-------------|-------------|--------|
 | **Model storage on EFS/S3** | Store models on EFS or S3 instead of EBS for better scalability and performance | Planned |
-| **Prometheus monitoring** | Add Prometheus-based observability for metrics collection and visualization | Planned |
-| **Model autoscaling** | Implement automatic scaling of model replicas based on traffic patterns | Planned |
+| **Prometheus monitoring** | Add Prometheus-based observability for metrics collection and visualization | ✅ Implemented |
+| **Model autoscaling** | Implement automatic scaling of model replicas based on traffic patterns | In Progress |
+| **GPU utilization optimization** | Further optimization of GPU utilization for improved cost efficiency | Planned |
 
 ## Contributing
 

@@ -18,15 +18,17 @@ grafana:
   adminPassword: {{ requiredEnv "GRAFANA_PASSWORD" }}
   ingress:
     ingressClassName: nginx
-    enabled: true
+    enabled: {{ if env "MONITORING_HOST" }}true{{ else }}false{{ end }}
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    {{ if env "MONITORING_HOST" }}
     hosts:
-      - {{ requiredEnv "MONITORING_HOST" }}
+      - {{ env "MONITORING_HOST" }}
     tls:
     - secretName: grafana-general-tls
       hosts:
-      - {{ requiredEnv "MONITORING_HOST" }}
+      - {{ env "MONITORING_HOST" }}
+    {{ end }}
 
 crds:
   enabled: true
@@ -40,15 +42,17 @@ prometheus:
   enabled: true
   ingress:
     ingressClassName: nginx
-    enabled: true
+    enabled: {{ if env "PROMETHEUS_HOST" }}true{{ else }}false{{ end }}
     annotations:
       cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    {{ if env "PROMETHEUS_HOST" }}
     hosts:
-      - {{ requiredEnv "PROMETHEUS_HOST" }}
+      - {{ env "PROMETHEUS_HOST" }}
     tls:
     - secretName: prometheus-general-tls
       hosts:
-      - {{ requiredEnv "PROMETHEUS_HOST" }}
+      - {{ env "PROMETHEUS_HOST" }}
+    {{ end }}
 
   additionalServiceMonitors:
   - name: "vllm-monitor"
@@ -59,7 +63,7 @@ prometheus:
     namespaceSelector:
       matchNames:
       - default
-      - vllm
+      - {{ env "VLLM_STACK_NAMESPACE" | default "vllm" }}
     endpoints:
     - port: "service-port"
   - name: "router-monitor"
@@ -70,6 +74,6 @@ prometheus:
     namespaceSelector:
       matchNames:
       - default
-      - vllm
+      - {{ env "VLLM_STACK_NAMESPACE" | default "vllm" }}
     endpoints:
     - port: "router-sport"
