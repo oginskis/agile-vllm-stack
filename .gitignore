@@ -11,3 +11,5 @@ helm/cert-manager/cluster-issuer.yaml
 
 # OS specific files
 .DS_Store
+
+.vscode
