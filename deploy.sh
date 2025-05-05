@@ -66,8 +66,25 @@ if [ -n "${MODEL_SPEC_FILE}" ] && [ "${MODEL_SPEC_FILE#/}" = "${MODEL_SPEC_FILE}
   # If path doesn't start with '/', it's relative - make it absolute
   MODEL_SPEC_FILE="$(pwd)/${MODEL_SPEC_FILE}"
 fi
-export MODEL_SPEC_FILE
 
+export NGINX_INGRESS_NAMESPACE
+export EXTERNAL_DNS_NAMESPACE
+export CERT_MANAGER_NAMESPACE
+export VLLM_STACK_NAMESPACE
+export PROMETHEUS_NAMESPACE
+
+export NGINX_INGRESS_VERSION
+export EXTERNAL_DNS_VERSION
+export CERT_MANAGER_VERSION
+export VLLM_STACK_VERSION
+export PROMETHEUS_STACK_VERSION
+export PROMETHEUS_ADAPTER_VERSION
+export GPU_EXPORTER_VERSION
+
+export PROMETHEUS_HOST
+export MONITORING_HOST
+export MODEL_SPEC_FILE
+export GRAFANA_PASSWORD
 export HF_TOKEN
 
 section "Configuration"
@@ -183,7 +200,7 @@ fi
 
 # Pass remaining arguments to helmfile, including context flag if set
 info "Applying Helm charts using helmfile..."
-if helmfile apply --kubeconfig "${KUBECONFIG_PATH}" -f "${HELMFILE_PATH}"; then
+if helmfile sync --kubeconfig "${KUBECONFIG_PATH}" -f "${HELMFILE_PATH}"; then
   success "Deployment completed successfully"
 else
   error "Helm deployment failed"

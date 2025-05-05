@@ -91,6 +91,8 @@ else
     warning "Helmfile command not found, skipping helm releases deletion"
 fi
 
+exit 0
+
 section "Cluster Deletion"
 # Check if the cluster exists before attempting to delete resources within it
 if eksctl get cluster --name "${CLUSTER_NAME}" --region "${CLUSTER_REGION}" > /dev/null 2>&1; then

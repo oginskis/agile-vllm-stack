@@ -7,8 +7,14 @@ repositories:
   url: https://charts.jetstack.io
 - name: vllm
   url: https://vllm-project.github.io/production-stack
+- name: prometheus-community
+  url: https://prometheus-community.github.io/helm-charts
+- name: gpu-helm-charts
+  url: https://nvidia.github.io/gpu-monitoring-tools/helm-charts
+
 
 releases:
+# Group 1: Install nginx-ingress first
 - name: nginx-ingress
   namespace: {{ env "NGINX_INGRESS_NAMESPACE" | default "ingress-nginx" }}
   chart: ingress-nginx/ingress-nginx
@@ -19,32 +25,84 @@ releases:
         annotations:
           service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
       replicaCount: 1
+  hooks:
+  - events: [ "postsync" ]
+    showlogs: true
+    command: "kubectl"
+    args:
+    - "wait"
+    - "--namespace"
+    - '{{ env "NGINX_INGRESS_NAMESPACE" | default "ingress-nginx" }}'
+    - "--for=condition=ready"
+    - "pod"
+    - "--selector=app.kubernetes.io/component=controller"
+    - "--timeout=120s"
+
+# Group 2: Install external-dns and cert-manager after nginx
 - name: external-dns
   namespace: {{ env "EXTERNAL_DNS_NAMESPACE" | default "kube-system" }}
   chart: bitnami/external-dns
   version: {{ env "EXTERNAL_DNS_VERSION" | default "8.7.4" }}
+  needs:
+  - {{ env "NGINX_INGRESS_NAMESPACE" | default "ingress-nginx" }}/nginx-ingress
   values:
   - provider: aws
     domainFilters:
     - {{ env "DNS_ZONE_NAME" | default "superhub.click" }}
+
 - name: cert-manager
   namespace: {{ env "CERT_MANAGER_NAMESPACE" | default "cert-manager" }}
   chart: jetstack/cert-manager
   version: {{ env "CERT_MANAGER_VERSION" | default "v1.17.1" }}
+  needs:
+  - {{ env "NGINX_INGRESS_NAMESPACE" | default "ingress-nginx" }}/nginx-ingress
   values:
   - installCRDs: true
   hooks:
-  - events: ["postsync"]
+  - events: [ "postsync" ]
     showlogs: true
     command: "kubectl"
     args:
-      - "apply"
-      - "-f"
-      - "helm/cert-manager/cluster-issuer.yaml"
+    - "apply"
+    - "-f"
+    - "helm/cert-manager/cluster-issuer.yaml"
+
+# Group 3: Install all remaining charts after the core infrastructure
 - name: vllm-router
   namespace: {{ env "VLLM_STACK_NAMESPACE" | default "vllm" }}
   chart: vllm/vllm-stack
   version: {{ env "VLLM_STACK_VERSION" | default "0.1.1" }}
+  needs:
+  - {{ env "CERT_MANAGER_NAMESPACE" | default "cert-manager" }}/cert-manager
+  - {{ env "EXTERNAL_DNS_NAMESPACE" | default "kube-system" }}/external-dns
   values:
   - helm/vllm-router/values.yaml.gotmpl
 
+- name: kube-prom-stack
+  namespace: {{ env "PROMETHEUS_NAMESPACE" | default "monitoring" }}
+  chart: prometheus-community/kube-prometheus-stack
+  version: {{ env "PROMETHEUS_STACK_VERSION" | default "71.1.0" }}
+  needs:
+  - {{ env "CERT_MANAGER_NAMESPACE" | default "cert-manager" }}/cert-manager
+  - {{ env "EXTERNAL_DNS_NAMESPACE" | default "kube-system" }}/external-dns
+  values:
+  - helm/kube-prom-stack/values.yaml.gotmpl
+  hooks:
+  - events: [ "postsync" ]
+    showlogs: true
+    command: "kubectl"
+    args:
+    - "apply"
+    - "-f"
+    - "helm/kube-prom-stack/dashboards/"
+    - "-n"
+    - '{{ env "PROMETHEUS_NAMESPACE" | default "monitoring" }}'
+
+- name: prometheus-adapter
+  namespace: {{ env "PROMETHEUS_NAMESPACE" | default "monitoring" }}
+  chart: prometheus-community/prometheus-adapter
+  version: {{ env "PROMETHEUS_ADAPTER_VERSION" | default "4.14.1" }}
+  needs:
+  - {{ env "PROMETHEUS_NAMESPACE" | default "monitoring" }}/kube-prom-stack
+  values:
+  - helm/prometheus-adapter/values.yaml.gotmpl
