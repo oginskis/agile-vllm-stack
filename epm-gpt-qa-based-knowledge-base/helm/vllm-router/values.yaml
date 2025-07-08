@@ -1,0 +1,60 @@
+routerSpec:
+  resources:
+    requests:
+      cpu: "2"
+      memory: "4G"
+    limits:
+      cpu: "4"
+      memory: "16G"
+  ingress:
+    annotations:
+      cert-manager.io/cluster-issuer: "acme-devops-delivery"
+    enabled: true
+    className: nginx
+    hosts:
+    - host: vllm-router.llm.lab.epam.com
+      paths:
+      - path: /
+        pathType: Prefix
+    tls:
+    - secretName: vllm-router-tls-cert
+      hosts:
+      - vllm-router.llm.lab.epam.com
+servingEngineSpec:
+  runtimeClassName: ""
+  modelSpec:
+  - name: llama3-1-8b
+    repository: vllm/vllm-openai
+    tag: v0.8.5
+    modelURL: meta-llama/Llama-3.1-8B-Instruct
+    replicaCount: 1
+    requestCPU: 4
+    requestMemory: 16Gi
+    requestGPU: 2
+    nodeSelectorTerms:
+      - matchExpressions:
+        - key: cloud.google.com/gke-accelerator
+          operator: "In"
+          values:
+          - "nvidia-l4"
+        - key: pod
+          operator: "In"
+          values:
+          - "l4-2x"
+    tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+    pvcStorage: 50Gi
+    storageClass: premium-rwo
+    vllmConfig:
+      enableChunkedPrefill: false
+      enablePrefixCaching: false
+      tensorParallelSize: 2
+      gpuMemoryUtilization: 0.97
+      maxModelLen: 16384
+      dtype: bfloat16
+      extraArgs: ["--disable-log-requests"]
+    hf_token:
+      secretName: vllm-stack-secret
+      secretKey: HF_TOKEN
