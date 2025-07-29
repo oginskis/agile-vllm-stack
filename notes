@@ -1,0 +1,12 @@
+#!/bin/sh
+kubectl logs -f vllm-qwen3-32b-awq-deployment-vllm-5b7df6489c-d76x8 | grep "Creating LMCacheEngine instance"
+kubectl logs -f vllm-qwen3-32b-awq-deployment-vllm-5b7df6489c-d76x8 | grep "Initializing LMCacheConfig"
+
+
+curl -X POST https://vllm-router.llm.lab.epam.com/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "/data/qwen-qwen3-32b-awq",
+      "messages": [{"role": "user", "content": "Explain the significance of KV cache in language models."}],
+      "max_tokens": 300
+    }' | jq '.'
