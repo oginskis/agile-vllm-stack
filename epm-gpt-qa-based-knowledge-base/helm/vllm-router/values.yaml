@@ -1,4 +1,8 @@
 routerSpec:
+  repository: "lmcache/lmstack-router"
+  tag: "latest"
+  routingLogic: "session"
+  sessionKey: "x-user-id"
   resources:
     requests:
       cpu: "2"
@@ -9,6 +13,13 @@ routerSpec:
   ingress:
     annotations:
       cert-manager.io/cluster-issuer: "acme-devops-delivery"
+      nginx.ingress.kubernetes.io/enable-cors: "true"
+      nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+      nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+      nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization,X-API-Key"
+      nginx.ingress.kubernetes.io/cors-expose-headers: "Content-Length,Content-Range,X-Request-Id"
+      nginx.ingress.kubernetes.io/cors-allow-credentials: "false"
+      nginx.ingress.kubernetes.io/cors-max-age: "86400"
     enabled: true
     className: nginx
     hosts:
@@ -20,41 +31,125 @@ routerSpec:
     - secretName: vllm-router-tls-cert
       hosts:
       - vllm-router.llm.lab.epam.com
+
+cacheserverSpec:
+  replicaCount: 1
+  containerPort: 8080
+  servicePort: 80
+  serde: "naive"
+  repository: "lmcache/vllm-openai"
+  tag: "latest-nightly"
+  resources:
+    requests:
+      cpu: "2"
+      memory: "4G"
+    limits:
+      cpu: "4"
+      memory: "10G"
+  labels:
+    environment: "cacheserver"
+    release: "cacheserver"
+
 servingEngineSpec:
   runtimeClassName: ""
   modelSpec:
-  - name: llama3-1-8b
-    repository: vllm/vllm-openai
-    tag: v0.8.5
-    modelURL: meta-llama/Llama-3.1-8B-Instruct
+  - name: qwen3-32b-awq
+    repository: lmcache/vllm-openai
+    tag: "latest-nightly"
+    modelURL: /data/qwen-qwen3-32b-awq
     replicaCount: 1
     requestCPU: 4
-    requestMemory: 16Gi
+    requestMemory: 20Gi
     requestGPU: 2
     nodeSelectorTerms:
-      - matchExpressions:
-        - key: cloud.google.com/gke-accelerator
-          operator: "In"
-          values:
-          - "nvidia-l4"
-        - key: pod
-          operator: "In"
-          values:
-          - "l4-2x"
+    - matchExpressions:
+      - key: cloud.google.com/gke-accelerator
+        operator: "In"
+        values:
+        - "nvidia-l4"
+      - key: pod
+        operator: "In"
+        values:
+        - "l4-2x"
     tolerations:
     - key: "nvidia.com/gpu"
       operator: "Exists"
       effect: "NoSchedule"
-    pvcStorage: 50Gi
-    storageClass: premium-rwo
+    extraVolumes:
+    - name: weights
+      persistentVolumeClaim:
+        claimName: qwen-qwen3-32b-awq-readonly
+    extraVolumeMounts:
+    - name: weights
+      mountPath: /data
+      readOnly: true
+    env:
+    - name: HF_HUB_OFFLINE
+      value: "1"
+    - name: TRANSFORMERS_OFFLINE
+      value: "1"
     vllmConfig:
-      enableChunkedPrefill: false
-      enablePrefixCaching: false
+      enablePrefixCaching: true
       tensorParallelSize: 2
-      gpuMemoryUtilization: 0.97
+      gpuMemoryUtilization: 0.92
       maxModelLen: 16384
-      dtype: bfloat16
-      extraArgs: ["--disable-log-requests"]
-    hf_token:
-      secretName: vllm-stack-secret
-      secretKey: HF_TOKEN
+      dtype: auto
+      extraArgs: [
+        "--disable-log-requests",
+        "--max-num-seqs", "16",
+        "--enforce-eager"
+      ]
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "20"
+
+  - name: meta-llama-llama-3-2-3b-instruct
+    repository: lmcache/vllm-openai
+    tag: "latest-nightly"
+    modelURL: /data/meta-llama-llama-3.2-3b-instruct
+    replicaCount: 1
+    requestCPU: 4
+    requestMemory: 20Gi
+    requestGPU: 2
+    nodeSelectorTerms:
+    - matchExpressions:
+      - key: cloud.google.com/gke-accelerator
+        operator: "In"
+        values:
+        - "nvidia-l4"
+      - key: pod
+        operator: "In"
+        values:
+        - "l4-2x"
+    tolerations:
+    - key: "nvidia.com/gpu"
+      operator: "Exists"
+      effect: "NoSchedule"
+    extraVolumes:
+    - name: weights
+      persistentVolumeClaim:
+        claimName: meta-llama-llama-3.2-3b-instruct-readonly
+    extraVolumeMounts:
+    - name: weights
+      mountPath: /data
+      readOnly: true
+    env:
+    - name: HF_HUB_OFFLINE
+      value: "1"
+    - name: TRANSFORMERS_OFFLINE
+      value: "1"
+    vllmConfig:
+      enablePrefixCaching: true
+      tensorParallelSize: 2
+      gpuMemoryUtilization: 0.92
+      maxModelLen: 16384
+      dtype: auto
+      extraArgs: [
+        "--disable-log-requests",
+        "--max-num-seqs", "16",
+        "--enforce-eager"
+      ]
+    lmcacheConfig:
+      enabled: true
+      cpuOffloadingBufferSize: "20"
+
